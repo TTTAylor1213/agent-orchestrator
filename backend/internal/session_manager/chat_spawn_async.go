@@ -524,7 +524,9 @@ func (m *Manager) retryFailedChatSpawn(ctx context.Context, rec domain.SessionRe
 		// without merging today's project defaults back into the saved choices.
 		cfg.EffortOverride = true
 		resolved, err := m.resolveAgentConfig(ctx, cfg, domain.ProjectConfig{})
-		if errors.Is(err, ports.ErrUnsupportedEffort) {
+		// Workers may retry on a provider default; never discard the selected
+		// orchestrator effort just to recover from a provisioning failure.
+		if errors.Is(err, ports.ErrUnsupportedEffort) && rec.Kind == domain.KindWorker {
 			cfg.AgentConfig.Effort = "" // use this model's provider default
 			resolved, err = m.resolveAgentConfig(ctx, cfg, domain.ProjectConfig{})
 		}

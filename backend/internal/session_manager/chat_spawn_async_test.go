@@ -368,6 +368,59 @@ func TestResumeFailedAsyncChatSpawnPreservesResolvedEffort(t *testing.T) {
 	}
 }
 
+// A retry must not quietly demote a project's Codex orchestrator if its
+// selected effort is no longer supported. The same session can retry later.
+func TestResumeFailedAsyncChatOrchestratorKeepsSelectedTuning(t *testing.T) {
+	ctx := context.Background()
+	launcher := &recordingLauncher{}
+	m, st, _ := newChatManager(launcher)
+	m.dataDir = t.TempDir()
+	m.browserCapabilities = browsersvc.NewAuthority()
+	project := st.projects[string(chatTestProject)]
+	project.Config.Worker = domain.RoleOverride{Harness: domain.HarnessDeepSeek}
+	project.Config.Orchestrator = domain.RoleOverride{
+		Harness:     domain.HarnessCodex,
+		AgentConfig: domain.AgentConfig{Model: "lead-model", Effort: "xhigh"},
+	}
+	st.projects[string(chatTestProject)] = project
+	supported := tuningCatalog{catalog: ports.AgentModelCatalog{Models: []ports.AgentModelInfo{
+		{ID: "lead-model", Efforts: []string{"high", "xhigh"}},
+	}}}
+	m.modelCatalog = supported
+	deferred := deferredBackground(m)
+	ws := m.workspace.(*fakeWorkspace)
+	ws.createErr = errors.New("temporary git failure")
+	rec, _, _, err := m.Spawn(ctx, ports.SpawnConfig{
+		ProjectID: chatTestProject, Kind: domain.KindOrchestrator, RequestedMode: domain.SessionModeChat, Async: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	(*deferred)[0]()
+	ws.createErr = nil
+	m.modelCatalog = tuningCatalog{catalog: ports.AgentModelCatalog{Models: []ports.AgentModelInfo{
+		{ID: "lead-model", Efforts: []string{"high"}},
+	}}}
+	if _, err := m.ResumeAgentWithMode(ctx, rec.ID); !errors.Is(err, ports.ErrUnsupportedEffort) {
+		t.Fatalf("retry error = %v, want unsupported orchestrator effort", err)
+	}
+	failed := st.sessions[rec.ID]
+	if failed.ProvisionState != domain.SessionProvisionFailed || failed.Metadata.Effort != "xhigh" || len(*deferred) != 1 || len(launcher.started) != 0 {
+		t.Fatalf("rejected retry changed failed session or scheduled a controller: %v, queued=%d, started=%d", failed, len(*deferred), len(launcher.started))
+	}
+	m.modelCatalog = supported
+	if _, err := m.ResumeAgentWithMode(ctx, rec.ID); err != nil {
+		t.Fatalf("retry with supported effort: %v", err)
+	}
+	(*deferred)[1]()
+	if len(launcher.started) != 1 {
+		t.Fatalf("controllers started = %d, want 1", len(launcher.started))
+	}
+	if cfg := launcher.started[0]; cfg.Harness != domain.HarnessCodex || cfg.Model != "lead-model" || cfg.Effort != "xhigh" {
+		t.Fatalf("controller got harness/model/effort = %q/%q/%q", cfg.Harness, cfg.Model, cfg.Effort)
+	}
+}
+
 func TestResumeFailedAsyncChatSpawnRevalidatesSavedTuning(t *testing.T) {
 	for _, tc := range []struct {
 		name         string

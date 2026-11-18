@@ -1,0 +1,12 @@
+{
+  "id": "ARM-FRAME-001",
+  "goal": "Check one frame against the synthetic v1 length contract.",
+  "state": "awaiting-decision",
+  "next": "Ask the technical owner whether a new protocol revision should count header bytes.",
+  "evidence": {
+    "contractSha256": "36ff5f88110c143f554dd6888945c0208d98c0808cdc33f7336c776174606db4",
+    "frameSha256": "73cca6d69377aa5f898ba093787e25325aab2eedb24e679e04051ad808d29dec"
+  },
+  "hypothesis": { "status": "unverified", "text": "Cache coherency may affect DMA throughput." },
+  "decision": { "status": "awaiting-human", "text": "Should a future length field count the header?" }
+}

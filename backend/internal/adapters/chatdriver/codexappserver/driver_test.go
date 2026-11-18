@@ -226,10 +226,11 @@ func nextEvent(t *testing.T, events <-chan ports.ChatEvent, want ports.ChatEvent
 
 func TestStartCompletesHandshakeAndOpensThread(t *testing.T) {
 	d, srv := newTestDriver(t)
+	workspace := t.TempDir()
 
 	conv, err := d.Start(context.Background(), ports.ChatStartConfig{
 		SessionID:     "ao-1",
-		WorkspacePath: "/tmp/ws",
+		WorkspacePath: workspace,
 		Model:         "gpt-test",
 		Effort:        "high",
 		Permissions:   ports.PermissionModeDefault,
@@ -261,7 +262,7 @@ func TestStartCompletesHandshakeAndOpensThread(t *testing.T) {
 	if err := json.Unmarshal(start.Params, &params); err != nil {
 		t.Fatalf("thread/start params: %v", err)
 	}
-	if params.Cwd != "/tmp/ws" {
+	if params.Cwd != workspace {
 		t.Errorf("cwd = %q", params.Cwd)
 	}
 	if params.DeveloperInstructions != "standing rules" {

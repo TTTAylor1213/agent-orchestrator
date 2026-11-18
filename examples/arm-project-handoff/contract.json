@@ -1,0 +1,7 @@
+{
+  "revision": "sim-frame-v1",
+  "scope": "synthetic-host",
+  "headerBytes": 2,
+  "lengthOrder": "little-endian",
+  "lengthCounts": "payload"
+}
